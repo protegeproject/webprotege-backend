@@ -39,6 +39,9 @@ class CreateProjectSagaManagerTest {
     private ProjectDetailsManager projectDetailsManager;
 
     @Mock
+    private ProjectBranchManager projectBranchManager;
+
+    @Mock
     private CommandExecutor<ProcessUploadedOntologiesRequest, ProcessUploadedOntologiesResponse> processOntologiesExecutor;
 
     @Mock
@@ -67,13 +70,16 @@ class CreateProjectSagaManagerTest {
     @Mock
     private ProjectDetails projectDetails;
 
+    @Mock
+    private ProjectBranch projectBranch;
+
     private ExecutionContext executionContext;
 
 
     @BeforeEach
     void setUp() {
         manager = new CreateProjectSagaManager(projectDetailsManager,
-                                               processOntologiesExecutor,
+                projectBranchManager, processOntologiesExecutor,
                                                createInitialRevisionHistoryExecutor,
                                                prepareBinaryFileBackupForUseExecutor,
                                                createProjectSmallFilesExecutor,
@@ -247,7 +253,7 @@ class CreateProjectSagaManagerTest {
         when(projectDetailsManager.getProjectDetails(any(ProjectId.class)))
                 .thenReturn(projectDetails);
 
-        var response = manager.executeFromBackup(newProjectSettingsWithSources, executionContext);
+        var response = manager.executeFromBackup(newProjectSettingsWithSources, "someBranch", executionContext);
         var result = response.get();
 
         assertNotNull(result);
@@ -257,6 +263,7 @@ class CreateProjectSagaManagerTest {
         verify(fileDownloader, times(1)).downloadFile(eq(revisionHistoryLocation));
         verify(revisionHistoryReplacer, times(1)).replaceRevisionHistory(any(ProjectId.class), any(Path.class));
         verify(projectDetailsManager, times(1)).registerProject(any(ProjectId.class), eq(newProjectSettingsWithSources));
+        verify(projectBranchManager, times(1)).registerBranchMapping(any(ProjectId.class), eq("someBranch"));
         verify(projectPermissionsInitializer, times(1)).applyDefaultPermissions(any(ProjectId.class), eq(janeDoe));
     }
 
@@ -267,7 +274,7 @@ class CreateProjectSagaManagerTest {
                 .thenReturn(CompletableFuture.failedFuture(errorForTest));
 
         try {
-            var response = manager.executeFromBackup(newProjectSettingsWithSources, executionContext);
+            var response = manager.executeFromBackup(newProjectSettingsWithSources, "someBranch", executionContext);
             response.get(); // This should throw an exception
             fail("Expected ExecutionException");
         } catch (ExecutionException e) {
@@ -278,6 +285,7 @@ class CreateProjectSagaManagerTest {
         verify(fileDownloader, never()).downloadFile(any());
         verify(revisionHistoryReplacer, never()).replaceRevisionHistory(any(ProjectId.class), any(Path.class));
         verify(projectDetailsManager, never()).registerProject(any(ProjectId.class), eq(newProjectSettingsWithSources));
+        verify(projectBranchManager, never()).registerBranchMapping(any(ProjectId.class), eq("someBranch"));
         verify(projectPermissionsInitializer, never()).applyDefaultPermissions(any(ProjectId.class), eq(janeDoe));
     }
 

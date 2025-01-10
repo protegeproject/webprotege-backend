@@ -10,7 +10,8 @@ import static com.google.common.base.MoreObjects.toStringHelper;
 @JsonTypeName(CreateNewProjectFromProjectBackupAction.CHANNEL)
 public record CreateNewProjectFromProjectBackupAction(
         @JsonProperty("newProjectId") ProjectId newProjectId,
-        @JsonProperty("newProjectSettings") NewProjectSettings newProjectSettings
+        @JsonProperty("newProjectSettings") NewProjectSettings newProjectSettings,
+        @JsonProperty("branchName") String branchName
 ) implements Action<CreateNewProjectFromProjectBackupResult> {
 
     public static final String CHANNEL = "webprotege.projects.CreateNewProjectFromProjectBackup";
@@ -22,7 +23,7 @@ public record CreateNewProjectFromProjectBackupAction(
 
     @Override
     public int hashCode() {
-        return Objects.hashCode(newProjectId, newProjectSettings);
+        return Objects.hashCode(newProjectId, newProjectSettings, branchName);
     }
 
     @Override
@@ -41,6 +42,7 @@ public record CreateNewProjectFromProjectBackupAction(
         return toStringHelper("CreateNewProjectFromProjectBackupAction")
                 .addValue(newProjectId)
                 .addValue(newProjectSettings)
+                .addValue(branchName)
                 .toString();
     }
 

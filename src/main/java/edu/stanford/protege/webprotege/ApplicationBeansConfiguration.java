@@ -301,6 +301,13 @@ public class ApplicationBeansConfiguration {
 
     @Singleton
     @Bean
+    ProjectBranchRepository getProjectBranchRepository(MongoTemplate mongoTemplate,
+                                                         ObjectMapper objectMapper) {
+        return new ProjectBranchRepository(mongoTemplate, objectMapper);
+    }
+
+    @Singleton
+    @Bean
     ProjectRevisionRepository projectRevisionRepository(MongoTemplate mongoTemplate, ObjectMapper objectMapper) {
         return new ProjectRevisionRepository(mongoTemplate, objectMapper);
     }

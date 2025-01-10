@@ -11,7 +11,7 @@ import org.springframework.stereotype.Component;
 
 import java.nio.file.Path;
 import java.util.*;
-import java.util.concurrent.*;
+import java.util.concurrent.CompletableFuture;
 
 /**
  * Matthew Horridge
@@ -24,6 +24,8 @@ public class CreateProjectSagaManager {
     private static final Logger logger = LoggerFactory.getLogger(CreateProjectSagaManager.class);
 
     private final ProjectDetailsManager projectDetailsManager;
+
+    private final ProjectBranchManager projectBranchManager;
 
     private final CommandExecutor<ProcessUploadedOntologiesRequest, ProcessUploadedOntologiesResponse> processOntologiesExecutor;
 
@@ -40,7 +42,7 @@ public class CreateProjectSagaManager {
 
 
     public CreateProjectSagaManager(ProjectDetailsManager projectDetailsManager,
-                                    CommandExecutor<ProcessUploadedOntologiesRequest, ProcessUploadedOntologiesResponse> processOntologiesExecutor,
+                                    ProjectBranchManager projectBranchManager, CommandExecutor<ProcessUploadedOntologiesRequest, ProcessUploadedOntologiesResponse> processOntologiesExecutor,
                                     CommandExecutor<CreateInitialRevisionHistoryRequest, CreateInitialRevisionHistoryResponse> createInitialRevisionHistoryExecutor,
                                     CommandExecutor<PrepareBackupFilesForUseRequest, PrepareBackupFilesForUseResponse> prepareBinaryFileBackupForUseExecutor,
                                     CommandExecutor<CreateProjectSmallFilesRequest, CreateProjectSmallFilesResponse> createProjectSmallFilesExecutor,
@@ -48,6 +50,7 @@ public class CreateProjectSagaManager {
                                     RevisionHistoryReplacer revisionHistoryReplacer,
                                     ProjectPermissionsInitializer projectPermissionsInitializer) {
         this.projectDetailsManager = projectDetailsManager;
+        this.projectBranchManager = projectBranchManager;
         this.processOntologiesExecutor = processOntologiesExecutor;
         this.createInitialRevisionHistoryExecutor = createInitialRevisionHistoryExecutor;
         this.prepareBinaryFileBackupForUseExecutor = prepareBinaryFileBackupForUseExecutor;
@@ -105,19 +108,20 @@ public class CreateProjectSagaManager {
                 });
     }
 
-    public CompletableFuture<CreateNewProjectFromProjectBackupResult> executeFromBackup(NewProjectSettings newProjectSettings, ExecutionContext executionContext) {
+    public CompletableFuture<CreateNewProjectFromProjectBackupResult> executeFromBackup(NewProjectSettings newProjectSettings, String branchName, ExecutionContext executionContext) {
         if (newProjectSettings.hasSourceDocument()) {
-            return createProjectFromBackupFile(new SagaStateWithSources(ProjectId.generate(), newProjectSettings, executionContext));
+            return createProjectFromBackupFile(new SagaStateWithSources(ProjectId.generate(), newProjectSettings, executionContext), branchName);
         }
         return null;
     }
 
-    private CompletableFuture<CreateNewProjectFromProjectBackupResult> createProjectFromBackupFile(SagaStateWithSources sagaState) {
+    private CompletableFuture<CreateNewProjectFromProjectBackupResult> createProjectFromBackupFile(SagaStateWithSources sagaState, String branchName) {
         logger.info("Creating an empty project: {}", sagaState.getNewProjectSettings());
         return prepareBackupFilesForRestore(sagaState)
                 .thenCompose(this::downloadRevisionHistory)
                 .thenCompose(this::copyRevisionHistoryToProject)
                 .thenCompose(this::createProjectSmallFiles)
+                .thenCompose((sagaStateWithSources) -> this.mapProjectToBranch(sagaStateWithSources, branchName))
                 .thenCompose(this::registerProject)
                 .thenCompose(this::initializeProjectPermissions)
                 .thenCompose(this::retrieveProjectDetails)
@@ -132,6 +136,13 @@ public class CreateProjectSagaManager {
                                 e.getCause());
                     }
                 });
+    }
+
+    private CompletableFuture<SagaStateWithSources> mapProjectToBranch(SagaStateWithSources sagaState, String branchName) {
+        return CompletableFuture.supplyAsync(() -> {
+            projectBranchManager.registerBranchMapping(sagaState.getProjectId(), branchName);
+            return sagaState;
+        });
     }
 
     private CompletableFuture<SagaStateWithSources> createProjectSmallFiles(SagaStateWithSources sagaState) {

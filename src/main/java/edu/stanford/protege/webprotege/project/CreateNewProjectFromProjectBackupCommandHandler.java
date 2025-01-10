@@ -35,7 +35,7 @@ public class CreateNewProjectFromProjectBackupCommandHandler implements Authoriz
     @Override
     public Mono<CreateNewProjectFromProjectBackupResult> handleRequest(CreateNewProjectFromProjectBackupAction request,
                                                                        ExecutionContext executionContext) {
-        var result = createProjectSagaManager.executeFromBackup(request.newProjectSettings(), executionContext);
+        var result = createProjectSagaManager.executeFromBackup(request.newProjectSettings(), request.branchName(), executionContext);
         return Mono.fromFuture(result);
     }
 
